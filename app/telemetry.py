@@ -13,7 +13,7 @@ class Telemetry:
     def record_success(self, model: str, latency_ms: float) -> None:
         with self._lock:
             self.total_requests += 1
-            self.latencies.append(latency_ms)
+            self.latencies.append(max(0.0, latency_ms))
             self.latencies = self.latencies[-1000:]
             self.by_model[model] += 1
 
@@ -24,7 +24,11 @@ class Telemetry:
     def snapshot(self) -> dict:
         with self._lock:
             values = sorted(self.latencies)
-            p95 = values[min(len(values) - 1, int(len(values) * 0.95))] if values else 0.0
+            if values:
+                index = min(len(values) - 1, max(0, int((len(values) - 1) * 0.95)))
+                p95 = values[index]
+            else:
+                p95 = 0.0
             total = self.total_requests
             errors = self.total_errors
             return {
