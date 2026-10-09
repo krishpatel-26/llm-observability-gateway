@@ -1,6 +1,6 @@
 from app.gateway import Gateway
 from app.models import ChatRequest, Message
-from app.telemetry import telemetry
+from app.telemetry import Telemetry, telemetry
 
 def test_chat_captures_metadata():
     r = Gateway().chat(ChatRequest(model="mock", messages=[Message(role="user", content="hello")]))
@@ -27,3 +27,10 @@ def test_empty_messages_are_classified():
     except ValueError:
         pass
     assert telemetry.snapshot()["errors_by_type"]["empty_messages"] == before + 1
+
+def test_latency_distribution_buckets():
+    stats = Telemetry()
+    for latency in (5, 20, 70, 800, 1500):
+        stats.record_success("test-model", latency)
+    snapshot = stats.snapshot()
+    assert snapshot["latency_buckets_ms"] == {"10": 1, "25": 1, "100": 1, "1000": 1, "+Inf": 1}
