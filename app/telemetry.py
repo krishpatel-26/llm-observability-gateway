@@ -8,6 +8,7 @@ class Telemetry:
     total_errors: int = 0
     latencies: list[float] = field(default_factory=list)
     by_model: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    errors_by_type: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     _lock: Lock = field(default_factory=Lock, repr=False)
 
     def record_success(self, model: str, latency_ms: float) -> None:
@@ -17,26 +18,22 @@ class Telemetry:
             self.latencies = self.latencies[-1000:]
             self.by_model[model] += 1
 
-    def record_error(self) -> None:
+    def record_error(self, error_type: str = "unknown") -> None:
         with self._lock:
             self.total_errors += 1
+            self.errors_by_type[error_type] += 1
 
     def snapshot(self) -> dict:
         with self._lock:
             values = sorted(self.latencies)
-            if values:
-                index = min(len(values) - 1, max(0, int((len(values) - 1) * 0.95)))
-                p95 = values[index]
-            else:
-                p95 = 0.0
-            total = self.total_requests
-            errors = self.total_errors
+            p95 = values[min(len(values) - 1, max(0, int((len(values) - 1) * .95)))] if values else 0.0
             return {
-                "requests": total,
-                "errors": errors,
-                "error_rate": round(errors / max(1, total + errors), 4),
+                "requests": self.total_requests,
+                "errors": self.total_errors,
+                "error_rate": round(self.total_errors / max(1, self.total_requests + self.total_errors), 4),
                 "p95_latency_ms": round(p95, 3),
                 "by_model": dict(self.by_model),
+                "errors_by_type": dict(self.errors_by_type),
             }
 
 telemetry = Telemetry()
