@@ -4,6 +4,7 @@ from threading import Lock
 
 LATENCY_BUCKETS_MS = (10, 25, 50, 100, 250, 500, 1000)
 
+
 @dataclass
 class Telemetry:
     total_requests: int = 0
@@ -24,23 +25,27 @@ class Telemetry:
             bucket = next((limit for limit in LATENCY_BUCKETS_MS if latency <= limit), "+Inf")
             self.latency_buckets[str(bucket)] += 1
 
-    def record_error(self, error_type: str = "unknown") -> None:
+    def record_error(self, error_type: str = "unknown", model: str = "unknown") -> None:
         with self._lock:
             self.total_errors += 1
             self.errors_by_type[error_type] += 1
+            self.by_model[f"{model}:error"] += 1
 
     def snapshot(self) -> dict:
         with self._lock:
             values = sorted(self.latencies)
             p95 = values[min(len(values) - 1, max(0, int((len(values) - 1) * .95)))] if values else 0.0
+            total = self.total_requests + self.total_errors
             return {
                 "requests": self.total_requests,
                 "errors": self.total_errors,
-                "error_rate": round(self.total_errors / max(1, self.total_requests + self.total_errors), 4),
+                "total_observations": total,
+                "error_rate": round(self.total_errors / max(1, total), 4),
                 "p95_latency_ms": round(p95, 3),
                 "by_model": dict(self.by_model),
                 "errors_by_type": dict(self.errors_by_type),
                 "latency_buckets_ms": dict(self.latency_buckets),
             }
+
 
 telemetry = Telemetry()
