@@ -1,0 +1,9 @@
+{
+  "window": "5m",
+  "total_observations": 1000,
+  "error_observations": 8,
+  "error_rate": 0.008,
+  "max_error_rate": 0.01,
+  "within_error_budget": true,
+  "note": "Synthetic example only"
+}
